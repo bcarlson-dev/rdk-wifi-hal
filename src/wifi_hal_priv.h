@@ -780,6 +780,47 @@ INT wifi_hal_setRMBeaconRequest(UINT apIndex, mac_address_t peer_mac, wifi_Beaco
 INT wifi_hal_cancelRMBeaconRequest(UINT apIndex, UCHAR dialogToken);
 INT wifi_hal_configNeighborReports(UINT apIndex, bool enable, bool auto_resp);
 INT wifi_hal_setNeighborReports(UINT apIndex, UINT numNeighborReports, wifi_NeighborReport_t *neighborReports);
+
+/**
+* @brief Add a vendor-specific Information Element to the AP's beacon/probe response
+*
+* @param[in]  apIndex  Access point index
+* @param[in]  oui      Pointer to the 3-byte Organization Unique Identifier
+* @param[in]  data     Pointer to the vendor-specific data to be included in the IE
+* @param[in]  data_len Length of the vendor-specific data in bytes
+*
+* @return The status of the operation
+* @retval RETURN_OK if successful
+* @retval RETURN_ERR if any error is detected
+*
+* @execution Synchronous
+* @sideeffect Updates beacon and probe response frames
+*
+*/
+INT wifi_addVendorSpecificIE(INT apIndex, const UCHAR *oui, UCHAR *data, UINT data_len);
+
+/**
+* @brief Remove a **single instance** of a vendor-specific Information Element from the AP's beacon/probe response (if present)
+* 
+* @note Certain drivers may override or not allow additional IEs to be removed causing
+*    the "Failed to set beacon parameters" error message to be logged from the
+*    `ieee802_11_set_beacon` / "UPDATE_BEACON" function.
+*
+* @param[in]  apIndex  Access point index
+* @param[in]  oui      Pointer to the 3-byte Organization Unique Identifier
+* @param[in]  data     Pointer to the vendor-specific data to match for removal
+* @param[in]  data_len Length of the vendor-specific data in bytes
+*
+* @return The status of the operation
+* @retval RETURN_OK if successful
+* @retval RETURN_ERR if any error is detected
+*
+* @execution Synchronous
+* @sideeffect Updates beacon and probe response frames
+*
+*/
+INT wifi_removeVendorSpecificIE(INT apIndex, const UCHAR *oui, UCHAR *data, UINT data_len);
+
 void wifi_hal_newApAssociatedDevice_callback_register(wifi_newApAssociatedDevice_callback func);
 void wifi_hal_apDisassociatedDevice_callback_register(wifi_apDisassociatedDevice_callback func);
 void wifi_hal_radiusEapFailure_callback_register(wifi_radiusEapFailure_callback func);
