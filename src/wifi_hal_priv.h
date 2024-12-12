@@ -784,14 +784,20 @@ INT wifi_hal_setNeighborReports(UINT apIndex, UINT numNeighborReports, wifi_Neig
 /**
 * @brief Add a vendor-specific Information Element to the AP's beacon/probe response
 *
+* @note Certain drivers may override or not allow additional IEs to be added causing 
+*    the "Failed to set beacon parameters" error message to be logged from the 
+*    `ieee802_11_set_beacon` / "UPDATE_BEACON" function.
+*
 * @param[in]  apIndex  Access point index
 * @param[in]  oui      Pointer to the 3-byte Organization Unique Identifier
 * @param[in]  data     Pointer to the vendor-specific data to be included in the IE
 * @param[in]  data_len Length of the vendor-specific data in bytes
 *
 * @return The status of the operation
-* @retval RETURN_OK if successful
-* @retval RETURN_ERR if any error is detected
+* @retval WIFI_HAL_SUCCESS if successful
+* @retval WIFI_HAL_INVALID_ARGUMENTS if any of the arguments are invalid
+* @retval WIFI_HAL_INTERNAL_ERROR if any internal error is detected
+* @retval WIFI_HAL_UNSUPPORTED if the driver does not support adding vendor-specific IEs
 *
 * @execution Synchronous
 * @sideeffect Updates beacon and probe response frames
@@ -812,8 +818,10 @@ INT wifi_addVendorSpecificIE(INT apIndex, const UCHAR *oui, UCHAR *data, UINT da
 * @param[in]  data_len Length of the vendor-specific data in bytes
 *
 * @return The status of the operation
-* @retval RETURN_OK if successful
-* @retval RETURN_ERR if any error is detected
+* @retval WIFI_HAL_SUCCESS if removed successfully or if the IE was not present
+* @retval WIFI_HAL_INVALID_ARGUMENTS if any of the arguments are invalid
+* @retval WIFI_HAL_INTERNAL_ERROR if any internal error is detected
+* @retval WIFI_HAL_UNSUPPORTED if the driver does not support removing vendor-specific IEs
 *
 * @execution Synchronous
 * @sideeffect Updates beacon and probe response frames
