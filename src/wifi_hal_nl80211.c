@@ -86,8 +86,6 @@ struct family_data {
     int id;
 };
 
-struct nl_msg *nl80211_drv_cmd_msg(int nl80211_id, wifi_interface_info_t *intf, int flags, uint8_t cmd);
-
 int nl80211_send_and_recv(struct nl_msg *msg,
              int (*valid_handler)(struct nl_msg *, void *),
              void *valid_data,
@@ -6389,6 +6387,7 @@ int nl80211_switch_channel(wifi_radio_info_t *radio)
     u8 seg0;
     char country[8];
     int ret = 0;
+    bool is_first_interface;
 
     param = &radio->oper_param;
     get_coutry_str_from_code(param->countryCode, country);
@@ -6458,6 +6457,7 @@ int nl80211_switch_channel(wifi_radio_info_t *radio)
     wifi_hal_dbg_print("%s:%d chan_freq: %d center_freq: %d bandwidth: %d sec_chan_offset: %d\n",
         __func__, __LINE__, freq, freq1, bandwidth, sec_chan_offset);
 
+    is_first_interface = true;
     hash_map_foreach(radio->interface_map, interface) {
         if (!interface->bss_started) {
             continue;
@@ -6470,13 +6470,16 @@ int nl80211_switch_channel(wifi_radio_info_t *radio)
         ret = hostapd_switch_channel(&interface->u.ap.hapd, &csa_settings);
         pthread_mutex_unlock(&g_wifi_hal.hapd_lock);
 
-        if (ret != 0) {
+        /* Ignore the error if the error is not on first interface,
+           as CSA would be in progress after the first interface channel switch. */
+        if (ret != 0 && is_first_interface == true) {
             wifi_hal_error_print("%s:%d interface: %s failed to switch channel to %d, error: %d\n",
                 __func__, __LINE__, interface->name, param->channel, ret);
+            return ret;
         }
+        is_first_interface = false;
     }
-
-    return ret;
+    return 0;
 }
 
 int nl80211_update_wiphy(wifi_radio_info_t *radio)
@@ -13039,6 +13042,7 @@ int wifi_drv_set_operstate(void *priv, int state)
     wifi_hal_info_print("%s:%d: Enter, interface:%s bridge:%s driver operation state:%d\n",
             __func__, __LINE__, interface->name, vap->bridge_name, state);
 
+#ifndef CONFIG_WIFI_EMULATOR
     if (interface->vap_configured == true) {
         if (state == 1) {
             wifi_hal_dbg_print("%s:%d: VAP already configured\n", __func__, __LINE__);
@@ -13054,6 +13058,7 @@ int wifi_drv_set_operstate(void *priv, int state)
             return 0;
         }
     }
+#endif
 
     if (vap->u.bss_info.enabled == false && vap->u.sta_info.enabled == false) {
         wifi_hal_dbg_print("%s:%d: VAP not enabled\n", __func__, __LINE__);
@@ -13092,6 +13097,12 @@ int wifi_drv_set_operstate(void *priv, int state)
         }
     }
 #else
+    if ((interface->vap_configured == true)  && (vap->vap_mode == wifi_vap_mode_sta)) {
+	 if (interface->u.sta.sta_sock_fd != 0) {
+             close(interface->u.sta.sta_sock_fd);
+             interface->u.sta.sta_sock_fd = 0;
+         }
+    }
     sock_fd = socket(AF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
     if (sock_fd < 0) {
         wifi_hal_error_print("%s:%d: Failed to open raw socket on bridge: %s\n", __func__, __LINE__, vap->bridge_name);
