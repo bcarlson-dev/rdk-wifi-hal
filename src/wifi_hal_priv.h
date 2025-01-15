@@ -790,6 +790,55 @@ INT wifi_hal_BTMQueryRequest_callback_register(UINT apIndex,
                                             wifi_BTMResponse_callback btmResponseCallback);
 INT wifi_hal_RMBeaconRequestCallbackRegister(UINT apIndex, wifi_RMBeaconReport_callback beaconReportCallback);
 INT wifi_hal_RMBeaconRequestCallbackUnregister(UINT apIndex, wifi_RMBeaconReport_callback beaconReportCallback);
+
+/**
+* @brief Add a vendor-specific Information Element to the AP's beacon/probe response
+*
+* @note Certain drivers may override or not allow additional IEs to be added causing 
+*    the "Failed to set beacon parameters" error message to be logged from the 
+*    `ieee802_11_set_beacon` / "UPDATE_BEACON" function.
+*
+* @param[in]  apIndex  Access point index
+* @param[in]  oui      Pointer to the 3-byte Organization Unique Identifier
+* @param[in]  data     Pointer to the vendor-specific data to be included in the IE
+* @param[in]  data_len Length of the vendor-specific data in bytes
+*
+* @return The status of the operation
+* @retval WIFI_HAL_SUCCESS if successful
+* @retval WIFI_HAL_INVALID_ARGUMENTS if any of the arguments are invalid
+* @retval WIFI_HAL_INTERNAL_ERROR if any internal error is detected
+* @retval WIFI_HAL_UNSUPPORTED if the driver does not support adding vendor-specific IEs
+*
+* @execution Synchronous
+* @sideeffect Updates beacon and probe response frames
+*
+*/
+INT wifi_hal_addVendorSpecificIE(INT apIndex, const UCHAR *oui, UCHAR *data, UINT data_len);
+
+/**
+* @brief Remove a **single instance** of a vendor-specific Information Element from the AP's beacon/probe response (if present)
+* 
+* @note Certain drivers may override or not allow additional IEs to be removed causing
+*    the "Failed to set beacon parameters" error message to be logged from the
+*    `ieee802_11_set_beacon` / "UPDATE_BEACON" function.
+*
+* @param[in]  apIndex  Access point index
+* @param[in]  oui      Pointer to the 3-byte Organization Unique Identifier
+* @param[in]  data     Pointer to the vendor-specific data to match for removal
+* @param[in]  data_len Length of the vendor-specific data in bytes
+*
+* @return The status of the operation
+* @retval WIFI_HAL_SUCCESS if removed successfully or if the IE was not present
+* @retval WIFI_HAL_INVALID_ARGUMENTS if any of the arguments are invalid
+* @retval WIFI_HAL_INTERNAL_ERROR if any internal error is detected
+* @retval WIFI_HAL_UNSUPPORTED if the driver does not support removing vendor-specific IEs
+*
+* @execution Synchronous
+* @sideeffect Updates beacon and probe response frames
+*
+*/
+INT wifi_hal_removeVendorSpecificIE(INT apIndex, const UCHAR *oui, UCHAR *data, UINT data_len);
+
 wifi_radio_info_t *get_radio_by_index(wifi_radio_index_t index);
 wifi_interface_info_t *get_interface_by_vap_index(unsigned int vap_index);
 wifi_interface_info_t *get_interface_by_if_index(unsigned int if_index);

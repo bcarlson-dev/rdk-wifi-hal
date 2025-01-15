@@ -265,6 +265,27 @@ void init_hostap_bss(wifi_interface_info_t *interface)
             }
         }
     }
+
+    // Add custom vendor elements if allocated
+    wifi_vap_info_t* vap_info = &interface->vap_info;
+    USHORT ves_len = vap_info->u.bss_info.vendor_elements_len;
+    struct wpabuf* ve_wpabuf = NULL;
+
+    if (vap_info->vap_mode == wifi_vap_mode_ap && ves_len > 0 && (ve_wpabuf = wpabuf_alloc(ves_len))) {
+        UCHAR* ve_s = vap_info->u.bss_info.vendor_elements;
+
+        wpabuf_put_data(ve_wpabuf, (void*) ve_s, ves_len);
+        if (conf->vendor_elements) {
+            // Add custom vendor elements to vendor elements defined above (suchh as OUI, if any)
+            // Both the original conf->vendor_elements and the ve_wpabuf are freed in the wpabuf_concat function
+            conf->vendor_elements = wpabuf_concat(conf->vendor_elements, ve_wpabuf);
+        } else {
+            // Set custom vendor elements as vendor elements since no vendor elements are defined previously
+            // Lifetime will be handled by hostapd 
+            conf->vendor_elements = ve_wpabuf;
+        }
+    }
+
 }
 
 void init_oem_config(wifi_interface_info_t *interface)
