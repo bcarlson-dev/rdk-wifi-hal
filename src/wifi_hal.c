@@ -3753,13 +3753,16 @@ typedef struct {
     u8 payload[]; /* Flexible array member for payload */
 } __attribute__((packed)) vendor_element_t;
 
-INT wifi_hal_addVendorSpecificIE(INT apIndex, const UCHAR *oui, UCHAR *data, UINT data_len)
+INT wifi_hal_addVendorSpecificIE(INT apIndex, const UCHAR *oui, const UCHAR type, const UCHAR subtype, UCHAR *payload, UINT payload_len)
 {
 
     wifi_interface_info_t *interface = NULL;
     wifi_hal_dbg_print("%s:%d: Enter: AP Index: %d\n", __func__, __LINE__, apIndex);
 
-    if (oui == NULL || data == NULL || data_len == 0) {
+    // Data includes type, subtype and payload
+    UINT data_len = sizeof(type) + sizeof(subtype) + payload_len;
+
+    if (oui == NULL) {
         wifi_hal_error_print("%s:%d: Invalid arguments\n", __func__, __LINE__);
         return WIFI_HAL_INVALID_ARGUMENTS;
     }
@@ -3795,7 +3798,10 @@ INT wifi_hal_addVendorSpecificIE(INT apIndex, const UCHAR *oui, UCHAR *data, UIN
     ve->element_id = 0xDD; // Vendor specific IE ID
     ve->length = ie_len;
     os_memcpy(ve->oui, oui, sizeof(ve->oui)); // Copy the OUI
-    os_memcpy(ve->payload, data, data_len); // Copy the data
+    uint8_t* mut_ptr = ve->payload;
+    *(mut_ptr++) = type; // Set the type
+    *(mut_ptr++) = subtype; // Set the subtype
+    os_memcpy(mut_ptr, payload, payload_len); // Copy the data
 
     // Check if we have room to add the new IE
     if (bss_info->vendor_elements_len + total_len > sizeof(bss_info->vendor_elements)) {
@@ -3810,8 +3816,8 @@ INT wifi_hal_addVendorSpecificIE(INT apIndex, const UCHAR *oui, UCHAR *data, UIN
 
     wifi_hal_dbg_print("%s:%d: Added vendor specific IE, new size=%d\n", __func__, __LINE__,
         bss_info->vendor_elements_len);
-    wifi_hal_dbg_print("%s:%d: OUI: %02x:%02x:%02x, Data: %s\n", __func__, __LINE__,
-        oui[0], oui[1], oui[2], data);
+    wifi_hal_dbg_print("%s:%d: OUI: %02x:%02x:%02x, Type: %02x, Subtype: %02x, Payload: %s\n",
+        __func__, __LINE__, oui[0], oui[1], oui[2], type, subtype, payload);
 
     char b[4096]={0},*p=b;
     for(int i=0;i<bss_info->vendor_elements_len;i++)p+=sprintf(p,"%02x ",bss_info->vendor_elements[i]);
@@ -3840,12 +3846,15 @@ INT wifi_hal_addVendorSpecificIE(INT apIndex, const UCHAR *oui, UCHAR *data, UIN
     return WIFI_HAL_SUCCESS;
 }
 
-INT wifi_hal_removeVendorSpecificIE(INT apIndex, const UCHAR *oui, UCHAR *data, UINT data_len)
+INT wifi_hal_removeVendorSpecificIE(INT apIndex, const UCHAR *oui, const UCHAR type, const UCHAR subtype, UCHAR *payload, UINT payload_len)
 {
     wifi_interface_info_t *interface = NULL;
     wifi_hal_dbg_print("%s:%d: Enter: AP Index: %d\n", __func__, __LINE__, apIndex);
 
-    if (oui == NULL || data == NULL || data_len == 0) {
+        // Data includes type, subtype and payload
+    UINT data_len = sizeof(type) + sizeof(subtype) + payload_len;
+
+    if (oui == NULL) {
         wifi_hal_error_print("%s:%d: Invalid arguments\n", __func__, __LINE__);
         return WIFI_HAL_INVALID_ARGUMENTS;
     }
@@ -3876,6 +3885,13 @@ INT wifi_hal_removeVendorSpecificIE(INT apIndex, const UCHAR *oui, UCHAR *data, 
     uint8_t *curr_pos = bss_info->vendor_elements;
     uint8_t *end_pos = bss_info->vendor_elements + bss_info->vendor_elements_len;
 
+    // Fill disposable data buffer for comparison to vendor IE data buffers
+    uint8_t data_cmp[255] = {0};
+    data_cmp[0] = type;
+    data_cmp[1] = subtype;
+    memcpy(data_cmp + 2, payload, payload_len);
+
+
     while (curr_pos < end_pos) {
         vendor_element_t *ve = (vendor_element_t *)curr_pos;
         
@@ -3900,7 +3916,7 @@ INT wifi_hal_removeVendorSpecificIE(INT apIndex, const UCHAR *oui, UCHAR *data, 
             continue;
         }
 
-        if (os_memcmp(ve->payload, data, data_len) != 0) {
+        if (os_memcmp(ve->payload, data_cmp, data_len) != 0) {
             wifi_hal_dbg_print("%s:%d: Skipping IE with different data\n", __func__, __LINE__);
             curr_pos += ve_len;
             continue;

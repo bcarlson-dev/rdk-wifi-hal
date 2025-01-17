@@ -814,14 +814,14 @@ INT wifi_hal_RMBeaconRequestCallbackUnregister(UINT apIndex, wifi_RMBeaconReport
 /**
 * @brief Add a vendor-specific Information Element to the AP's beacon/probe response
 *
-* @note Certain drivers may override or not allow additional IEs to be added causing 
-*    the "Failed to set beacon parameters" error message to be logged from the 
-*    `ieee802_11_set_beacon` / "UPDATE_BEACON" function.
+* @note Certain drivers require a type **and a subtype**. The `subtype` can be 0x00 if not needed.
 *
 * @param[in]  apIndex  Access point index
 * @param[in]  oui      Pointer to the 3-byte Organization Unique Identifier
-* @param[in]  data     Pointer to the vendor-specific data to be included in the IE
-* @param[in]  data_len Length of the vendor-specific data in bytes
+* @param[in]  type     Vendor-specific type
+* @param[in]  subtype  Vendor-specific subtype
+* @param[in]  payload     Pointer to the vendor-specific data to be included in the IE
+* @param[in]  payload_len Length of the vendor-specific data in bytes
 *
 * @return The status of the operation
 * @retval WIFI_HAL_SUCCESS if successful
@@ -833,19 +833,19 @@ INT wifi_hal_RMBeaconRequestCallbackUnregister(UINT apIndex, wifi_RMBeaconReport
 * @sideeffect Updates beacon and probe response frames
 *
 */
-INT wifi_hal_addVendorSpecificIE(INT apIndex, const UCHAR *oui, UCHAR *data, UINT data_len);
+INT wifi_hal_addVendorSpecificIE(INT apIndex, const UCHAR *oui, const UCHAR type, const UCHAR subtype, UCHAR *payload, UINT payload_len);
 
 /**
 * @brief Remove a **single instance** of a vendor-specific Information Element from the AP's beacon/probe response (if present)
 * 
-* @note Certain drivers may override or not allow additional IEs to be removed causing
-*    the "Failed to set beacon parameters" error message to be logged from the
-*    `ieee802_11_set_beacon` / "UPDATE_BEACON" function.
+* @note Certain drivers require a type **and a subtype**. The `subtype` can be 0x00 if not needed.
 *
 * @param[in]  apIndex  Access point index
 * @param[in]  oui      Pointer to the 3-byte Organization Unique Identifier
-* @param[in]  data     Pointer to the vendor-specific data to match for removal
-* @param[in]  data_len Length of the vendor-specific data in bytes
+* @param[in]  type     Vendor-specific type
+* @param[in]  subtype  Vendor-specific subtype
+* @param[in]  payload     Pointer to the vendor-specific data to be included in the IE
+* @param[in]  payload_len Length of the vendor-specific data in bytes
 *
 * @return The status of the operation
 * @retval WIFI_HAL_SUCCESS if removed successfully or if the IE was not present
@@ -857,7 +857,7 @@ INT wifi_hal_addVendorSpecificIE(INT apIndex, const UCHAR *oui, UCHAR *data, UIN
 * @sideeffect Updates beacon and probe response frames
 *
 */
-INT wifi_hal_removeVendorSpecificIE(INT apIndex, const UCHAR *oui, UCHAR *data, UINT data_len);
+INT wifi_hal_removeVendorSpecificIE(INT apIndex, const UCHAR *oui, const UCHAR type, const UCHAR subtype, UCHAR *payload, UINT payload_len);
 
 wifi_radio_info_t *get_radio_by_index(wifi_radio_index_t index);
 wifi_interface_info_t *get_interface_by_vap_index(unsigned int vap_index);
