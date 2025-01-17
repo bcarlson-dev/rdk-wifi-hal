@@ -3757,7 +3757,7 @@ INT wifi_hal_addVendorSpecificIE(INT apIndex, const UCHAR *oui, UCHAR *data, UIN
 {
 
     wifi_interface_info_t *interface = NULL;
-    wifi_hal_dbg_print("%s:%d: Enter.\n", __func__, __LINE__);
+    wifi_hal_dbg_print("%s:%d: Enter: AP Index: %d\n", __func__, __LINE__, apIndex);
 
     if (oui == NULL || data == NULL || data_len == 0) {
         wifi_hal_error_print("%s:%d: Invalid arguments\n", __func__, __LINE__);
@@ -3771,36 +3771,13 @@ INT wifi_hal_addVendorSpecificIE(INT apIndex, const UCHAR *oui, UCHAR *data, UIN
         return WIFI_HAL_INVALID_ARGUMENTS;
     }
 
-    wifi_vap_info_map_t vap_map;
-    memset(&vap_map, 0, sizeof(wifi_vap_info_map_t));
-
-    if (wifi_hal_getRadioVapInfoMap(interface->index, &vap_map) != RETURN_OK){
-        wifi_hal_error_print("%s:%d wifi_hal_getRadioVapInfoMap failed\n", __func__,
-            __LINE__);
-        return WIFI_HAL_INVALID_ARGUMENTS;
-    }
-
-    if (vap_map.num_vaps == 0) {
-        wifi_hal_error_print("%s:%d No VAPs found for radio %d\n", __func__, __LINE__,
-            interface->index);
-        return WIFI_HAL_INVALID_ARGUMENTS;
-    }
-
-    wifi_vap_info_t* sel_vap_info = &vap_map.vap_array[apIndex];
-
-    if (sel_vap_info == NULL) {
-        wifi_hal_error_print("%s:%d No VAP found for index %d\n", __func__, __LINE__,
-            apIndex);
-        return WIFI_HAL_INVALID_ARGUMENTS;
-    }
-
-    if (sel_vap_info->vap_mode != wifi_vap_mode_ap) {
+    if (interface->vap_info.vap_mode != wifi_vap_mode_ap) {
         wifi_hal_error_print("%s:%d VAP mode is not AP for index %d\n", __func__,
             __LINE__, apIndex);
         return WIFI_HAL_INVALID_ARGUMENTS;
     }
 
-    wifi_front_haul_bss_t* bss_info = &sel_vap_info->u.bss_info;
+    wifi_front_haul_bss_t* bss_info = &interface->vap_info.u.bss_info;
 
     // END: Get BSS info
 
@@ -3829,16 +3806,36 @@ INT wifi_hal_addVendorSpecificIE(INT apIndex, const UCHAR *oui, UCHAR *data, UIN
 
     // Append the new vendor IE to the array
     os_memcpy(bss_info->vendor_elements + bss_info->vendor_elements_len, ve, total_len);
+    bss_info->vendor_elements_len += total_len;
+
+    wifi_hal_dbg_print("%s:%d: Added vendor specific IE, new size=%d\n", __func__, __LINE__,
+        bss_info->vendor_elements_len);
+    wifi_hal_dbg_print("%s:%d: OUI: %02x:%02x:%02x, Data: %s\n", __func__, __LINE__,
+        oui[0], oui[1], oui[2], data);
+
+    char b[4096]={0},*p=b;
+    for(int i=0;i<bss_info->vendor_elements_len;i++)p+=sprintf(p,"%02x ",bss_info->vendor_elements[i]);
+    wifi_hal_dbg_print("%s:%d All IE Data: %s\n",__func__,__LINE__,b);
 
     os_free(ve);
 
-    // Reconfigure the VAP, updating the beacon with the new IE
-    if (wifi_hal_createVAP(sel_vap_info->radio_index, &vap_map) != RETURN_OK) {
-        wifi_hal_error_print("%s:%d: Cannot reconfigure beacon\n", __func__, __LINE__);
-        // wpabuf_printf(bss_info->vendor_elements,
-        //     "Failed to update beacon with vendor specific IE: \n");
+    // Set `hapd.conf->vendor_elements` to the `bss_info->vendor_elements` contents
+    struct wpabuf *vendor_elements = wpabuf_alloc_copy(bss_info->vendor_elements, bss_info->vendor_elements_len);
+    pthread_mutex_lock(&g_wifi_hal.hapd_lock);
+    if (interface->u.ap.hapd.conf->vendor_elements) {
+        wpabuf_free(interface->u.ap.hapd.conf->vendor_elements);
+    }
+    interface->u.ap.hapd.conf->vendor_elements = vendor_elements;
+
+    if (ieee802_11_set_beacon(&interface->u.ap.hapd) < 0) {
+        wifi_hal_error_print("%s:%d: Cannot update beacon\n", __func__, __LINE__);
+        wpabuf_printf(interface->u.ap.hapd.conf->vendor_elements,
+            "Failed to update beacon with vendor specific IE: \n");
+        pthread_mutex_unlock(&g_wifi_hal.hapd_lock);
         return WIFI_HAL_UNSUPPORTED;
     }
+
+    pthread_mutex_unlock(&g_wifi_hal.hapd_lock);
 
     return WIFI_HAL_SUCCESS;
 }
@@ -3846,7 +3843,7 @@ INT wifi_hal_addVendorSpecificIE(INT apIndex, const UCHAR *oui, UCHAR *data, UIN
 INT wifi_hal_removeVendorSpecificIE(INT apIndex, const UCHAR *oui, UCHAR *data, UINT data_len)
 {
     wifi_interface_info_t *interface = NULL;
-    wifi_hal_dbg_print("%s:%d: Enter.\n", __func__, __LINE__);
+    wifi_hal_dbg_print("%s:%d: Enter: AP Index: %d\n", __func__, __LINE__, apIndex);
 
     if (oui == NULL || data == NULL || data_len == 0) {
         wifi_hal_error_print("%s:%d: Invalid arguments\n", __func__, __LINE__);
@@ -3860,36 +3857,13 @@ INT wifi_hal_removeVendorSpecificIE(INT apIndex, const UCHAR *oui, UCHAR *data, 
         return WIFI_HAL_INVALID_ARGUMENTS;
     }
 
-    wifi_vap_info_map_t vap_map;
-    memset(&vap_map, 0, sizeof(wifi_vap_info_map_t));
-
-    if (wifi_hal_getRadioVapInfoMap(interface->index, &vap_map) != RETURN_OK){
-        wifi_hal_error_print("%s:%d wifi_hal_getRadioVapInfoMap failed\n", __func__,
-            __LINE__);
-        return WIFI_HAL_INVALID_ARGUMENTS;
-    }
-
-    if (vap_map.num_vaps == 0) {
-        wifi_hal_error_print("%s:%d No VAPs found for radio %d\n", __func__, __LINE__,
-            interface->index);
-        return WIFI_HAL_INVALID_ARGUMENTS;
-    }
-
-    wifi_vap_info_t* sel_vap_info = &vap_map.vap_array[apIndex];
-
-    if (sel_vap_info == NULL) {
-        wifi_hal_error_print("%s:%d No VAP found for index %d\n", __func__, __LINE__,
-            apIndex);
-        return WIFI_HAL_INVALID_ARGUMENTS;
-    }
-
-    if (sel_vap_info->vap_mode != wifi_vap_mode_ap) {
+    if (interface->vap_info.vap_mode != wifi_vap_mode_ap) {
         wifi_hal_error_print("%s:%d VAP mode is not AP for index %d\n", __func__,
             __LINE__, apIndex);
         return WIFI_HAL_INVALID_ARGUMENTS;
     }
 
-    wifi_front_haul_bss_t* bss_info = &sel_vap_info->u.bss_info;
+    wifi_front_haul_bss_t* bss_info = &interface->vap_info.u.bss_info;
 
     // END: Get BSS info
 
@@ -3946,11 +3920,23 @@ INT wifi_hal_removeVendorSpecificIE(INT apIndex, const UCHAR *oui, UCHAR *data, 
         // Update total length
         bss_info->vendor_elements_len -= ve_len;
 
-        // Call createVAP to update the beacon without the removed IE
-        if (wifi_hal_createVAP(sel_vap_info->radio_index, &vap_map) != RETURN_OK) {
-            wifi_hal_error_print("%s:%d: Cannot reconfigure beacon\n", __func__, __LINE__);
+        // Set `hapd.conf->vendor_elements` to the `bss_info->vendor_elements` contents
+        struct wpabuf *vendor_elements = wpabuf_alloc_copy(bss_info->vendor_elements, bss_info->vendor_elements_len);
+        pthread_mutex_lock(&g_wifi_hal.hapd_lock);
+        if (interface->u.ap.hapd.conf->vendor_elements) {
+            wpabuf_free(interface->u.ap.hapd.conf->vendor_elements);
+        }
+        interface->u.ap.hapd.conf->vendor_elements = vendor_elements;
+
+        if (ieee802_11_set_beacon(&interface->u.ap.hapd) < 0) {
+            wifi_hal_error_print("%s:%d: Cannot update beacon\n", __func__, __LINE__);
+            wpabuf_printf(interface->u.ap.hapd.conf->vendor_elements,
+                "Failed to update beacon with vendor specific IE: \n");
+            pthread_mutex_unlock(&g_wifi_hal.hapd_lock);
             return WIFI_HAL_UNSUPPORTED;
         }
+
+        pthread_mutex_unlock(&g_wifi_hal.hapd_lock);
 
         wifi_hal_dbg_print("%s:%d: Removed vendor specific IE\n", __func__, __LINE__);
         return WIFI_HAL_SUCCESS;
